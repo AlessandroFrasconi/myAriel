@@ -1,0 +1,84 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows.Forms;
+
+namespace OrdinamentoPersoneLambda
+{
+    public partial class Form1 : Form
+    {
+        private List<Persona> persone;
+        private bool crescente = true;
+
+        public Form1()
+        {
+            InitializeComponent();
+
+            persone = new List<Persona>
+            {
+                new Persona("Luca", "Rossi", 20),
+                new Persona("Anna", "Bianchi", 18),
+                new Persona("Marco", "Verdi", 25),
+                new Persona("Giulia", "Neri", 22)
+            };
+
+            AggiornaLista();
+
+            // --- Mappa dei criteri di ordinamento ---
+            var criteri = new Dictionary<Button, Func<Persona, object>>
+            {
+                { btnOrdinaNome, p => p.Nome },
+                { btnOrdinaCognome, p => p.Cognome },
+                { btnOrdinaEtà, p => p.Età }
+            };
+
+            // --- Assegnazione eventi con lambda ---
+            foreach (var criterio in criteri)
+            {
+                criterio.Key.Click += (s, e) =>
+                {
+                    persone = crescente
+                        ? persone.OrderBy(criterio.Value).ToList()
+                        : persone.OrderByDescending(criterio.Value).ToList();
+                    AggiornaLista();
+                };
+            }
+
+            // --- Inversione ordine ---
+            btnInvertiOrdine.Click += (s, e) =>
+            {
+                crescente = !crescente;
+                btnInvertiOrdine.Text = crescente ? "Crescente" : "Decrescente";
+            };
+
+            // --- Randomizza ---
+            btnRandomizza.Click += (s, e) =>
+            {
+                var rnd = new Random();
+                persone = persone.OrderBy(_ => rnd.Next()).ToList();
+                AggiornaLista();
+            };
+        }
+
+        private void AggiornaLista()
+        {
+            listBoxPersone.Items.Clear();
+            persone.ForEach(p =>
+                listBoxPersone.Items.Add($"{p.Nome} {p.Cognome} - {p.Età} anni"));
+        }
+    }
+
+    public class Persona
+    {
+        public string Nome { get; set; }
+        public string Cognome { get; set; }
+        public int Età { get; set; }
+
+        public Persona(string nome, string cognome, int età)
+        {
+            Nome = nome;
+            Cognome = cognome;
+            Età = età;
+        }
+    }
+}

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyAriel Resource Manager 🎓</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>🎓 MyAriel Resource Manager</h1>
+            <p class="subtitle">Tutte le tue risorse universitarie, organizzate e sempre accessibili</p>
+        </header>
+
+        <!-- Login Section (se necessario) -->
+        <div id="loginSection" class="card" style="display: none;">
+            <h2>🔐 Accesso a myAriel</h2>
+            <p>Inserisci le tue credenziali per accedere alle risorse</p>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="email">Email (senza @studenti.unimi.it)</label>
+                    <input type="text" id="email" name="email" placeholder="nome.cognome" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                <div class="form-group">
+                    <label for="domain">Dominio</label>
+                    <select id="domain" name="domain">
+                        <option value="@studenti.unimi.it">@studenti.unimi.it</option>
+                        <option value="@unimi.it">@unimi.it</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Accedi</button>
+            </form>
+        </div>
+
+        <!-- Cookie Import Section -->
+            <div id="app">
+        <!-- Login Section -->
+        <div id="loginSection" class="card">
+            <h2>🔐 Login</h2>
+
+        <!-- Controls -->
+        <div class="controls">
+            <button id="refreshBtn" class="btn btn-primary">🔄 Aggiorna Risorse</button>
+            <button id="toggleViewBtn" class="btn btn-secondary">📋 Vista Compatta</button>
+            <input type="text" id="searchInput" placeholder="🔍 Cerca per corso o risorsa..." class="search-input">
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Caricamento in corso...</p>
+        </div>
+
+        <!-- Cache Info -->
+        <div id="cacheInfo" class="cache-info" style="display: none;"></div>
+
+        <!-- Resources Container -->
+        <div id="resourcesContainer" class="resources-container">
+            <!-- I corsi verranno inseriti qui dinamicamente -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <p>📚 Nessuna risorsa trovata</p>
+            <p class="small">Prova a cliccare su "Aggiorna Risorse" per caricare i dati da myAriel</p>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
