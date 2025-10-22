@@ -95,13 +95,12 @@ class MyArielScraper:
     
     def login(self, email=None, password=None, domain=None):
         """Esegue login a myAriel con autenticazione Shibboleth"""
-        # Usa credenziali da parametri o da .env
-        email = email or os.getenv('MYARIEL_EMAIL')
-        password = password or os.getenv('MYARIEL_PASSWORD')
-        domain = domain or os.getenv('MYARIEL_DOMAIN', '@studenti.unimi.it')
+        # Le credenziali devono essere fornite esplicitamente
+        # Non usiamo più variabili d'ambiente per sicurezza
+        domain = domain or '@studenti.unimi.it'
         
         if not email or not password:
-            return False, "Credenziali mancanti"
+            return False, "Credenziali mancanti - effettua il login"
         
         # Costruisci username completo
         full_username = email if '@' in email else f"{email}{domain}"
@@ -591,96 +590,293 @@ class MyArielScraper:
     
     def get_course_details(self, course_id):
         """Recupera tutti i dettagli di un corso: programma, annunci, videolezioni, risorse"""
+        # Assicurati che la sessione sia autenticata
         if not self.logged_in and not self.load_session():
-            self.login()
+            print("  → Nessuna sessione trovata, eseguo login...")
+            success, message = self.login()
+            if not success:
+                print(f"  ✗ Login fallito: {message}")
+                return {
+                    'course_name': f'Corso {course_id}',
+                    'programma_html': '',
+                    'annunci': [],
+                    'videolezioni': [],
+                    'risorse': []
+                }, f"Login fallito: {message}"
+            print(f"  ✓ Login riuscito: {message}")
         
         try:
             course_url = f'{MYARIEL_BASE_URL}/course/view.php?id={course_id}'
+            print(f"→ Carico pagina corso: {course_url}")
             response = self.session.get(course_url)
             soup = BeautifulSoup(response.text, 'html.parser')
             
+            # Salva HTML per debug
+            with open(f'debug_course_{course_id}.html', 'w', encoding='utf-8') as f:
+                f.write(response.text)
+            print(f"  → HTML salvato in debug_course_{course_id}.html")
+            
             # Nome del corso
-            course_name_elem = soup.find('h1') or soup.find('h2', class_='course-title')
+            course_name_elem = soup.find('h1') or soup.find('div', class_='page-header-headings')
+            if not course_name_elem:
+                course_name_elem = soup.find('h2')
             course_name = course_name_elem.get_text(strip=True) if course_name_elem else f"Corso {course_id}"
+            print(f"  → Nome corso: {course_name}")
             
-            # 1. Cerca il link al Programma
+            # PRIMA: Recupera TUTTE le risorse del corso per cercare programma e bacheca
+            print(f"  → Recupero risorse del corso...")
+            resources, _ = self.get_course_resources(course_id)
+            
+            # 1. Cerca il link al Programma/Informazioni nelle risorse
             programma_html = ""
-            programma_link = soup.find('a', string=lambda x: x and 'programma' in x.lower() if x else False)
-            if programma_link and programma_link.get('href'):
-                programma_url = programma_link['href']
-                if not programma_url.startswith('http'):
-                    programma_url = MYARIEL_BASE_URL + programma_url
-                
-                print(f"  → Recupero programma da: {programma_url}")
-                prog_response = self.session.get(programma_url)
-                prog_soup = BeautifulSoup(prog_response.text, 'html.parser')
-                
-                # Estrai il contenuto principale (senza header/footer)
-                content = prog_soup.find('div', id='region-main') or prog_soup.find('div', class_='content')
-                if content:
-                    programma_html = str(content)
+            programma_keywords = ['programma', 'informazioni sul corso', 'program', 'syllabus', 'piano di studi', 'course information']
+            programma_url = None
             
-            # 2. Cerca il link alla Bacheca degli annunci
+            print("  → Ricerca link programma/informazioni...")
+            if resources:
+                for section in resources:
+                    for res in section.get('resources', []):
+                        res_name_lower = res['name'].lower()
+                        if any(keyword in res_name_lower for keyword in programma_keywords):
+                            programma_url = res['url']
+                            print(f"  ✓ Trovato link programma: '{res['name']}'")
+                            break
+                    if programma_url:
+                        break
+            
+            if programma_url:
+                try:
+                    prog_response = self.session.get(programma_url)
+                    prog_soup = BeautifulSoup(prog_response.text, 'html.parser')
+                    
+                    # Salva HTML per debug
+                    with open(f'debug_programma_{course_id}.html', 'w', encoding='utf-8') as f:
+                        f.write(prog_response.text)
+                    print(f"  → HTML programma salvato in debug_programma_{course_id}.html")
+                    
+                    # Cerca il contenuto del programma in vari possibili contenitori
+                    # Priorità: activity-description (Moodle pages), poi region-main
+                    content = prog_soup.find('div', class_='activity-description') or \
+                             prog_soup.find('div', id='intro') or \
+                             prog_soup.find('div', id='region-main') or \
+                             prog_soup.find('div', class_='content') or \
+                             prog_soup.find('article') or \
+                             prog_soup.find('main')
+                    
+                    if content:
+                        # Rimuovi elementi di navigazione e header
+                        for elem in content.find_all(['nav', 'aside', 'header']):
+                            elem.decompose()
+                        
+                        # Cerca specificamente il div con class "no-overflow" che contiene il programma
+                        no_overflow = content.find('div', class_='no-overflow')
+                        if no_overflow:
+                            programma_html = str(no_overflow)
+                            print(f"  ✓ Trovato div 'no-overflow' con {len(programma_html)} caratteri")
+                        else:
+                            programma_html = str(content)
+                            print(f"  ✓ Uso contenuto generico con {len(programma_html)} caratteri")
+                        
+                        print(f"  ✓ Programma recuperato ({len(programma_html)} caratteri)")
+                    else:
+                        print(f"  ⚠ Nessun contenitore trovato per il programma")
+                except Exception as e:
+                    print(f"  ✗ Errore recupero programma: {e}")
+                    import traceback
+                    traceback.print_exc()
+            else:
+                print(f"  ⚠ Link programma non trovato")
+            
+            # 2. Cerca il link alla Bacheca degli annunci nelle risorse
             annunci = []
-            bacheca_link = soup.find('a', string=lambda x: x and 'bacheca' in x.lower() and 'annunci' in x.lower() if x else False)
-            if bacheca_link and bacheca_link.get('href'):
-                bacheca_url = bacheca_link['href']
-                if not bacheca_url.startswith('http'):
-                    bacheca_url = MYARIEL_BASE_URL + bacheca_url
-                
+            bacheca_keywords = ['bacheca', 'annunci', 'announcements', 'news', 'bacheca degli annunci']
+            bacheca_url = None
+            
+            print("  → Ricerca link bacheca/annunci...")
+            if resources:
+                for section in resources:
+                    for res in section.get('resources', []):
+                        res_name_lower = res['name'].lower()
+                        # Cerca forum/bacheca
+                        if (res['type'] == 'forum' or '/mod/forum/' in res['url']) and \
+                           any(keyword in res_name_lower for keyword in bacheca_keywords):
+                            bacheca_url = res['url']
+                            print(f"  ✓ Trovato link bacheca: '{res['name']}'")
+                            break
+                    if bacheca_url:
+                        break
+            
+            if bacheca_url:
                 print(f"  → Recupero annunci da: {bacheca_url}")
-                ann_response = self.session.get(bacheca_url)
-                ann_soup = BeautifulSoup(ann_response.text, 'html.parser')
-                
-                # Trova gli annunci (spesso in <div class="forumpost"> o simili)
-                posts = ann_soup.find_all(['div', 'article'], class_=lambda x: x and ('post' in x or 'discussion' in x or 'topic' in x) if x else False)
-                
-                for post in posts:
-                    title_elem = post.find(['h3', 'h4', 'h2', 'a'], class_=lambda x: x and 'subject' in x if x else False) or \
-                                 post.find(['h3', 'h4', 'h2'])
+                try:
+                    ann_response = self.session.get(bacheca_url)
+                    ann_soup = BeautifulSoup(ann_response.text, 'html.parser')
                     
-                    content_elem = post.find('div', class_=lambda x: x and ('content' in x or 'message' in x) if x else False)
+                    # Salva HTML per debug
+                    with open(f'debug_bacheca_{course_id}.html', 'w', encoding='utf-8') as f:
+                        f.write(ann_response.text)
+                    print(f"  → HTML bacheca salvato in debug_bacheca_{course_id}.html")
                     
-                    date_elem = post.find('time') or post.find(class_=lambda x: x and 'date' in x if x else False)
+                    # Cerca la lista di discussioni/annunci
+                    # Moodle forum mostra gli annunci in una tabella o lista
+                    discussions = []
                     
-                    if title_elem:
+                    # Prova 1: Cerca tabella discussioni
+                    discussion_table = ann_soup.find('table', class_=lambda x: x and 'discussion' in str(x).lower() if x else False)
+                    if discussion_table:
+                        print("  → Trovata tabella discussioni")
+                        for row in discussion_table.find_all('tr'):
+                            # Cerca il link alla discussione
+                            link = row.find('a', href=lambda x: x and '/mod/forum/discuss.php' in x if x else False)
+                            if link:
+                                discussions.append({
+                                    'title': link.get_text(strip=True),
+                                    'url': link.get('href') if link.get('href').startswith('http') else MYARIEL_BASE_URL + link.get('href')
+                                })
+                    
+                    # Prova 2: Cerca lista discussioni
+                    if not discussions:
+                        print("  → Cerco lista discussioni...")
+                        discussion_links = ann_soup.find_all('a', href=lambda x: x and '/mod/forum/discuss.php' in x if x else False)
+                        for link in discussion_links[:20]:
+                            title = link.get_text(strip=True)
+                            if title and len(title) > 5:  # Filtra link troppo corti
+                                discussions.append({
+                                    'title': title,
+                                    'url': link.get('href') if link.get('href').startswith('http') else MYARIEL_BASE_URL + link.get('href')
+                                })
+                    
+                    print(f"  → Trovate {len(discussions)} discussioni")
+                    
+                    # Per ogni discussione, prendi solo titolo e data (senza entrare nel dettaglio)
+                    for disc in discussions[:5]:  # Limita ai primi 5
                         annunci.append({
-                            'title': title_elem.get_text(strip=True),
-                            'content': content_elem.get_text(strip=True) if content_elem else '',
-                            'date': date_elem.get_text(strip=True) if date_elem else ''
+                            'title': disc['title'],
+                            'content': '',  # Non entriamo nel dettaglio
+                            'date': ''
                         })
+                    
+                    print(f"  ✓ Recuperati {len(annunci)} annunci")
+                except Exception as e:
+                    print(f"  ✗ Errore recupero annunci: {e}")
+                    import traceback
+                    traceback.print_exc()
+            else:
+                print(f"  ⚠ Link bacheca non trovato")
             
             # 3. Recupera risorse e filtra videolezioni
+            print(f"  → Recupero risorse del corso...")
             resources, _ = self.get_course_resources(course_id)
             
             videolezioni = []
             altre_risorse = []
             
             if resources:
+                print(f"  → Trovate {len(resources)} sezioni con risorse")
                 for section in resources:
+                    section_name = section.get('section', '').lower()
+                    
+                    # Se l'intera sezione si chiama "Videolezioni", tutti i contenuti sono video
+                    is_video_section = any(kw in section_name for kw in ['videolezioni', 'videolezione', 'video lezioni', 'registrazioni', 'video'])
+                    
                     for res in section.get('resources', []):
-                        # Identifica videolezioni (link a video o pagine video)
-                        if any(keyword in res['name'].lower() for keyword in ['video', 'lezione', 'lecture', 'registrazione']):
+                        res_name_lower = res['name'].lower()
+                        
+                        # Se è una cartella con nome "videolezioni", espandila
+                        is_video_folder = res['type'] == 'folder' and any(kw in res_name_lower for kw in ['videolezioni', 'videolezione', 'video lezioni', 'registrazioni'])
+                        
+                        if is_video_folder:
+                            print(f"  → Espansione cartella videolezioni: {res['name']}")
+                            try:
+                                folder_contents, _ = self.get_folder_contents(res['url'])
+                                if folder_contents:
+                                    for video_file in folder_contents:
+                                        videolezioni.append({
+                                            'name': video_file['name'],
+                                            'url': video_file['url'],
+                                            'section': section.get('section', 'Generale')
+                                        })
+                                    print(f"    ✓ Aggiunti {len(folder_contents)} video dalla cartella")
+                            except Exception as e:
+                                print(f"    ✗ Errore espansione cartella: {e}")
+                        
+                        # Se la SEZIONE si chiama "videolezioni", TUTTI gli item sono video (anche se il nome è una data)
+                        elif is_video_section and res['type'] in ['url', 'file']:
                             videolezioni.append({
                                 'name': res['name'],
                                 'url': res['url'],
                                 'section': section.get('section', 'Generale')
                             })
-                        else:
-                            # Altre risorse rimangono organizzate per sezione
-                            pass
+                            print(f"    ✓ Video da sezione: '{res['name']}'")
+                        
+                        # Oppure identifica videolezioni dal nome della risorsa (se NON in sezione video)
+                        elif not is_video_section and any(keyword in res_name_lower for keyword in ['video', 'lezione', 'lecture', 'registrazione', 'streaming']):
+                            videolezioni.append({
+                                'name': res['name'],
+                                'url': res['url'],
+                                'section': section.get('section', 'Generale')
+                            })
+                
+                # Mantieni tutte le risorse per sezione (escluse videolezioni, programma e bacheca)
+                altre_risorse = []
+                programma_keywords_filter = ['programma', 'informazioni sul corso', 'program', 'syllabus', 'piano di studi', 'course information']
+                bacheca_keywords_filter = ['bacheca', 'annunci', 'announcements', 'news', 'bacheca degli annunci']
+                
+                for section in resources:
+                    section_name = section.get('section', '').lower()
+                    is_video_section = any(kw in section_name for kw in ['videolezioni', 'videolezione', 'video lezioni', 'registrazioni', 'video'])
                     
-                    # Mantieni la struttura originale per altre risorse
-                    altre_risorse.append(section)
+                    filtered_resources = []
+                    for res in section.get('resources', []):
+                        res_name_lower = res['name'].lower()
+                        
+                        # Escludi programma/informazioni sul corso
+                        is_programma = any(kw in res_name_lower for kw in programma_keywords_filter)
+                        
+                        # Escludi bacheca/forum
+                        is_bacheca = (res['type'] == 'forum' or '/mod/forum/' in res['url']) and \
+                                    any(kw in res_name_lower for kw in bacheca_keywords_filter)
+                        
+                        # Escludi videolezioni singole e cartelle videolezioni
+                        is_video_folder = res['type'] == 'folder' and any(kw in res_name_lower for kw in ['videolezioni', 'videolezione', 'video lezioni', 'registrazioni'])
+                        is_single_video = any(kw in res_name_lower for kw in ['video', 'lezione', 'lecture', 'registrazione', 'streaming'])
+                        
+                        # Se l'intera sezione è videolezioni, escludi tutti gli item
+                        if not is_programma and not is_bacheca and not is_video_folder and not is_single_video and not is_video_section:
+                            filtered_resources.append(res)
+                    
+                    if filtered_resources:
+                        altre_risorse.append({
+                            'section': section.get('section', 'Generale'),
+                            'resources': filtered_resources
+                        })
+                
+                print(f"  ✓ Identificate {len(videolezioni)} videolezioni")
+            else:
+                print(f"  ⚠ Nessuna risorsa trovata")
             
-            return {
+            result = {
                 'id': course_id,
                 'name': course_name,
                 'programma': programma_html,
                 'annunci': annunci,
                 'videolezioni': videolezioni,
                 'risorse': altre_risorse
-            }, "OK"
+            }
+            
+            print(f"✓ Dettagli corso recuperati:")
+            print(f"  - Programma: {len(programma_html)} caratteri")
+            print(f"  - Annunci: {len(annunci)}")
+            print(f"  - Videolezioni: {len(videolezioni)}")
+            print(f"  - Sezioni risorse: {len(altre_risorse)}")
+            
+            return result, "OK"
+            
+        except Exception as e:
+            print(f"✗ Errore recupero dettagli corso: {e}")
+            import traceback
+            traceback.print_exc()
+            return None, str(e)
             
         except Exception as e:
             print(f"✗ Errore recupero dettagli corso: {e}")
@@ -705,6 +901,13 @@ class MyArielScraper:
             # Cerca i file nella cartella (struttura Moodle)
             file_links = soup.find_all('a', href=lambda x: x and ('/pluginfile.php' in x or '/mod/resource/' in x or '/mod/folder/' in x) if x else False)
             
+            # Lista di nomi da escludere (link di sistema, lingua, ecc.)
+            excluded_names = [
+                'deutsch', 'english', 'español', 'français', 'العربية',
+                'italiano', 'de', 'en', 'es', 'fr', 'ar', 'it',
+                'language', 'lingua', 'idioma', 'sprache', 'langue'
+            ]
+            
             for link in file_links:
                 href = link.get('href')
                 name = link.get_text(strip=True)
@@ -716,9 +919,22 @@ class MyArielScraper:
                         accesshide.decompose()
                     name = instancename.get_text(strip=True)
                 
-                if name and href and len(name) > 2:
+                # Filtra link di sistema e lingua
+                name_lower = name.lower()
+                if any(excluded in name_lower for excluded in excluded_names):
+                    continue
+                
+                # Filtra link troppo corti o solo emoji
+                if not name or len(name) < 3 or name in ['📁', '📄', '🔗']:
+                    continue
+                
+                if href:
+                    # Costruisci URL completo
                     if not href.startswith('http'):
                         href = MYARIEL_BASE_URL + href
+                    
+                    # Per i file /pluginfile.php, assicurati che l'URL sia completo
+                    # Alcuni link potrebbero avere ?forcedownload=1 che va mantenuto
                     
                     # Determina il tipo
                     file_type = 'file'
@@ -726,6 +942,12 @@ class MyArielScraper:
                         file_type = 'folder'
                     elif '/mod/url/' in href:
                         file_type = 'url'
+                    elif '/mod/resource/' in href:
+                        file_type = 'file'
+                    elif '/pluginfile.php' in href:
+                        file_type = 'file'
+                    
+                    print(f"    ✓ File: '{name}' → {href[:100]}")
                     
                     files.append({
                         'name': name,

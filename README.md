@@ -38,24 +38,22 @@ Un'applicazione web per accedere automaticamente alle risorse di **myAriel** (Un
    pip install -r requirements.txt
    ```
 
-4. **Configura le credenziali**
+4. **Configura la chiave segreta** (opzionale)
    
    Copia il file `.env.example` in `.env`:
    ```bash
    cp .env.example .env
    ```
    
-   Modifica il file `.env` con le tue credenziali:
+   Modifica il file `.env` con una chiave segreta casuale:
    ```env
-   MYARIEL_EMAIL=nome.cognome
-   MYARIEL_PASSWORD=la_tua_password
-   MYARIEL_DOMAIN=@studenti.unimi.it
-   SECRET_KEY=una_chiave_segreta_casuale_123456
+   SECRET_KEY=una_chiave_segreta_casuale_molto_lunga_123456
    ```
    
-   ⚠️ **IMPORTANTE**: 
-   - L'email va inserita **senza** il dominio (es: `mario.rossi` non `mario.rossi@studenti.unimi.it`)
-   - Non condividere mai il file `.env`!
+   ⚠️ **NOTA**: 
+   - Le credenziali MyAriel NON vanno più configurate qui
+   - Il login viene fatto tramite interfaccia web
+   - La sessione viene salvata in cache per 2 ore
 
 ## 🎯 Utilizzo
 
@@ -125,26 +123,28 @@ La ricerca funziona su:
 
 - Le credenziali sono salvate **solo localmente** nel file `.env`
 - Il file `.env` è escluso dal controllo versione (`.gitignore`)
-- Le sessioni sono salvate in file locali criptati
-- **Non condividere mai** il file `.env` o la cartella `cache/`
+- Le sessioni sono salvate in file locali (session_cache.pkl)
+- La sessione viene mantenuta per 2 ore dopo il login
 
 ## ⚠️ Note Importanti
 
-1. **Credenziali**: Assicurati di inserire le credenziali corrette in `.env`
+1. **Login**: Inserisci le tue credenziali alla prima apertura dell'app
 2. **Dominio**: Seleziona il dominio corretto (@studenti.unimi.it o @unimi.it)
-3. **Cache**: La cache scade dopo 2 ore, poi serve un nuovo login
+3. **Cache**: La sessione scade dopo 2 ore di inattività
 4. **Rete**: Devi essere connesso a Internet per accedere a myAriel
+5. **Privacy**: Le credenziali vengono usate solo per il login e non vengono salvate
 
 ## 🐛 Risoluzione Problemi
 
-### "Credenziali mancanti"
-- Verifica che il file `.env` esista e sia configurato correttamente
-- Controlla che l'email sia senza dominio (solo `nome.cognome`)
-
 ### "Login fallito"
-- Verifica le credenziali
+- Verifica le credenziali inserite
 - Prova ad accedere manualmente a myAriel per confermare la password
-- Controlla che il dominio sia corretto
+- Controlla che il dominio selezionato sia corretto
+- L'email va inserita SENZA il dominio (es: `nome.cognome` non `nome.cognome@studenti.unimi.it`)
+
+### "Sessione scaduta"
+- Effettua nuovamente il login tramite la homepage
+- La sessione dura 2 ore dall'ultimo utilizzo
 
 ### "Nessuna risorsa trovata"
 - Clicca su "Aggiorna Risorse"

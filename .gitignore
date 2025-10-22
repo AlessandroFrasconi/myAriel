@@ -5,6 +5,7 @@ __pycache__/
 *.so
 .Python
 venv/
+.venv/
 env/
 ENV/
 
@@ -31,3 +32,5 @@ sessions/
 downloads/
 *.db
 credentials.json
+session_cache.pkl
+debug_*.html

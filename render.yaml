@@ -9,11 +9,6 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.0
-      - key: MYARIEL_EMAIL
-        sync: false
-      - key: MYARIEL_PASSWORD
-        sync: false
-      - key: MYARIEL_DOMAIN
-        value: "@studenti.unimi.it"
       - key: SECRET_KEY
         generateValue: true
+

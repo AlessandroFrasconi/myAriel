@@ -130,8 +130,20 @@ function displayResources(risorse) {
     // Aggiungi event listeners per le cartelle
     document.querySelectorAll('.folder-item').forEach(item => {
         item.addEventListener('click', (e) => {
+            // Se il click è su un link <a>, non fare nulla (lascia che il link funzioni)
+            if (e.target.tagName === 'A') {
+                return;
+            }
             e.preventDefault();
+            e.stopPropagation();
             toggleFolder(item);
+        });
+    });
+    
+    // Aggiungi event listeners ai link normali per evitare che chiudano le cartelle
+    document.querySelectorAll('.resource-item:not(.folder-item) .resource-link').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.stopPropagation();
         });
     });
 }
@@ -242,9 +254,20 @@ async function toggleFolder(folderItem) {
             // Aggiungi event listener per sotto-cartelle (ricorsivo)
             contentsDiv.querySelectorAll('.folder-item').forEach(subFolder => {
                 subFolder.addEventListener('click', (e) => {
+                    // Se il click è su un link <a>, non fare nulla
+                    if (e.target.tagName === 'A') {
+                        return;
+                    }
                     e.preventDefault();
                     e.stopPropagation();
                     toggleFolder(subFolder);
+                });
+            });
+            
+            // Aggiungi event listener ai link dei file per evitare che chiudano le cartelle
+            contentsDiv.querySelectorAll('.resource-item:not(.folder-item) .resource-link').forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.stopPropagation();
                 });
             });
         } else {

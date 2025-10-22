@@ -285,40 +285,47 @@ body {
     padding: 25px 30px;
     border-radius: 12px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    margin-bottom: 30px;
 }
 
 .resources-section h2 {
     font-size: 22px;
-    margin-bottom: 15px;
+    margin-bottom: 20px;
     color: #333;
 }
 
 .section-card {
-    margin-bottom: 20px;
+    margin-bottom: 15px;
     border: 1px solid #e0e0e0;
-    border-radius: 8px;
+    border-radius: 10px;
     overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.section-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: #667eea;
 }
 
 .section-header {
-    background: #f8f9fa;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     padding: 15px 20px;
     font-weight: 600;
-    color: #333;
+    color: white;
     cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    transition: background 0.3s;
+    transition: all 0.3s ease;
 }
 
 .section-header:hover {
-    background: #e9ecef;
+    background: linear-gradient(135deg, #5568d3 0%, #653a8b 100%);
 }
 
 .section-toggle {
     font-size: 20px;
-    transition: transform 0.3s;
+    transition: transform 0.3s ease;
 }
 
 .section-card.expanded .section-toggle {
@@ -328,7 +335,8 @@ body {
 .section-content {
     max-height: 0;
     overflow: hidden;
-    transition: max-height 0.3s ease;
+    transition: max-height 0.4s ease;
+    background: white;
 }
 
 .section-card.expanded .section-content {
@@ -338,13 +346,25 @@ body {
 .resource-list {
     list-style: none;
     padding: 15px 20px;
+    margin: 0;
 }
 
 .resource-item {
     display: flex;
     align-items: center;
-    padding: 10px 0;
-    border-bottom: 1px solid #f0f0f0;
+    padding: 12px 15px;
+    margin-bottom: 8px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-bottom: none;
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
+}
+
+.resource-item:hover {
+    background: #e9ecef;
+    border-left-color: #667eea;
+    transform: translateX(5px);
 }
 
 .resource-item:last-child {
@@ -354,6 +374,7 @@ body {
 .resource-icon {
     font-size: 20px;
     margin-right: 12px;
+    min-width: 24px;
 }
 
 .resource-link {
@@ -361,7 +382,8 @@ body {
     color: #667eea;
     text-decoration: none;
     font-size: 15px;
-    transition: color 0.3s;
+    font-weight: 500;
+    transition: color 0.2s ease;
 }
 
 .resource-link:hover {
@@ -371,28 +393,65 @@ body {
 
 .folder-item {
     cursor: pointer;
+    position: relative;
 }
 
 .folder-item .resource-link {
-    color: #333;
-    font-weight: 500;
+    color: #6f42c1;
+    font-weight: 600;
+}
+
+.folder-item:hover {
+    background: #f3e8ff;
+    border-left-color: #6f42c1;
 }
 
 .folder-item:hover .resource-link {
-    color: #667eea;
+    color: #5a2d8f;
 }
 
 .folder-contents {
-    margin-left: 40px;
+    margin-left: 30px;
     margin-top: 10px;
-    padding-left: 15px;
+    padding: 15px;
     border-left: 2px solid #e0e0e0;
+    animation: slideDown 0.3s ease;
+    background: #fafbfc;
+    border-radius: 8px;
+}
+
+.folder-contents .resource-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 0;
+}
+
+.folder-contents .resource-item {
+    flex: 0 0 auto;
+    min-width: 200px;
+    max-width: 300px;
+    margin-bottom: 0;
+    padding: 10px 15px;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .folder-loading {
-    color: #999;
+    color: #6c757d;
     font-size: 14px;
     font-style: italic;
+    text-align: center;
+    padding: 10px;
 }
 
 /* Modal */
