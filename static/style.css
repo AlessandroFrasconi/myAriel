@@ -257,11 +257,27 @@ header h1 {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    transition: all 0.3s;
+}
+
+.course-header:hover {
+    background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
 }
 
 .course-header h3 {
     font-size: 1.3em;
     margin: 0;
+}
+
+.course-action {
+    font-size: 0.9em;
+    font-weight: 600;
+    opacity: 0.9;
+    transition: opacity 0.3s;
+}
+
+.course-header:hover .course-action {
+    opacity: 1;
 }
 
 .course-toggle {

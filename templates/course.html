@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corso - MyAriel</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='course.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="course-header">
+            <div class="breadcrumb">
+                <a href="/">🏠 Home</a>
+                <span>›</span>
+                <a href="/">Corsi</a>
+                <span>›</span>
+                <span id="courseName">Caricamento...</span>
+            </div>
+            <h1 id="courseTitle">Caricamento corso...</h1>
+        </header>
+
+        <!-- Loading -->
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Caricamento dettagli corso...</p>
+        </div>
+
+        <!-- Error -->
+        <div id="errorState" class="error-state" style="display: none;">
+            <h2>❌ Errore</h2>
+            <p id="errorMessage"></p>
+            <button onclick="location.href='/'">Torna ai corsi</button>
+        </div>
+
+        <!-- Content -->
+        <div id="courseContent" style="display: none;">
+            
+            <!-- Annunci Section -->
+            <section class="announcements-section">
+                <h2>📢 Annunci</h2>
+                <div id="announcementsList"></div>
+                <button id="showAllAnnouncements" style="display: none;">
+                    Mostra tutti gli annunci
+                </button>
+            </section>
+
+            <!-- Main Content: 2 Columns -->
+            <div class="main-content">
+                <!-- Left Column: Programma -->
+                <section class="programma-section">
+                    <h2>📖 Programma del Corso</h2>
+                    <div id="programmaContent" class="programma-content"></div>
+                </section>
+
+                <!-- Right Column: Videolezioni -->
+                <aside class="videolezioni-section">
+                    <h2>🎥 Videolezioni</h2>
+                    <div id="videolezioniList" class="videolezioni-list"></div>
+                </aside>
+            </div>
+
+            <!-- Resources Section -->
+            <section class="resources-section">
+                <h2>📁 Risorse del Corso</h2>
+                <div id="resourcesList" class="resources-list"></div>
+            </section>
+
+        </div>
+    </div>
+
+    <!-- Modal for All Announcements -->
+    <div id="announcementsModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>📢 Tutti gli Annunci</h2>
+            <div id="allAnnouncementsList"></div>
+        </div>
+    </div>
+
+    <script>
+        const COURSE_ID = '{{ course_id }}';
+    </script>
+    <script src="{{ url_for('static', filename='course.js') }}"></script>
+</body>
+</html>

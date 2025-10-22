@@ -588,6 +588,156 @@ class MyArielScraper:
             except:
                 pass
         return None, None
+    
+    def get_course_details(self, course_id):
+        """Recupera tutti i dettagli di un corso: programma, annunci, videolezioni, risorse"""
+        if not self.logged_in and not self.load_session():
+            self.login()
+        
+        try:
+            course_url = f'{MYARIEL_BASE_URL}/course/view.php?id={course_id}'
+            response = self.session.get(course_url)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Nome del corso
+            course_name_elem = soup.find('h1') or soup.find('h2', class_='course-title')
+            course_name = course_name_elem.get_text(strip=True) if course_name_elem else f"Corso {course_id}"
+            
+            # 1. Cerca il link al Programma
+            programma_html = ""
+            programma_link = soup.find('a', string=lambda x: x and 'programma' in x.lower() if x else False)
+            if programma_link and programma_link.get('href'):
+                programma_url = programma_link['href']
+                if not programma_url.startswith('http'):
+                    programma_url = MYARIEL_BASE_URL + programma_url
+                
+                print(f"  → Recupero programma da: {programma_url}")
+                prog_response = self.session.get(programma_url)
+                prog_soup = BeautifulSoup(prog_response.text, 'html.parser')
+                
+                # Estrai il contenuto principale (senza header/footer)
+                content = prog_soup.find('div', id='region-main') or prog_soup.find('div', class_='content')
+                if content:
+                    programma_html = str(content)
+            
+            # 2. Cerca il link alla Bacheca degli annunci
+            annunci = []
+            bacheca_link = soup.find('a', string=lambda x: x and 'bacheca' in x.lower() and 'annunci' in x.lower() if x else False)
+            if bacheca_link and bacheca_link.get('href'):
+                bacheca_url = bacheca_link['href']
+                if not bacheca_url.startswith('http'):
+                    bacheca_url = MYARIEL_BASE_URL + bacheca_url
+                
+                print(f"  → Recupero annunci da: {bacheca_url}")
+                ann_response = self.session.get(bacheca_url)
+                ann_soup = BeautifulSoup(ann_response.text, 'html.parser')
+                
+                # Trova gli annunci (spesso in <div class="forumpost"> o simili)
+                posts = ann_soup.find_all(['div', 'article'], class_=lambda x: x and ('post' in x or 'discussion' in x or 'topic' in x) if x else False)
+                
+                for post in posts:
+                    title_elem = post.find(['h3', 'h4', 'h2', 'a'], class_=lambda x: x and 'subject' in x if x else False) or \
+                                 post.find(['h3', 'h4', 'h2'])
+                    
+                    content_elem = post.find('div', class_=lambda x: x and ('content' in x or 'message' in x) if x else False)
+                    
+                    date_elem = post.find('time') or post.find(class_=lambda x: x and 'date' in x if x else False)
+                    
+                    if title_elem:
+                        annunci.append({
+                            'title': title_elem.get_text(strip=True),
+                            'content': content_elem.get_text(strip=True) if content_elem else '',
+                            'date': date_elem.get_text(strip=True) if date_elem else ''
+                        })
+            
+            # 3. Recupera risorse e filtra videolezioni
+            resources, _ = self.get_course_resources(course_id)
+            
+            videolezioni = []
+            altre_risorse = []
+            
+            if resources:
+                for section in resources:
+                    for res in section.get('resources', []):
+                        # Identifica videolezioni (link a video o pagine video)
+                        if any(keyword in res['name'].lower() for keyword in ['video', 'lezione', 'lecture', 'registrazione']):
+                            videolezioni.append({
+                                'name': res['name'],
+                                'url': res['url'],
+                                'section': section.get('section', 'Generale')
+                            })
+                        else:
+                            # Altre risorse rimangono organizzate per sezione
+                            pass
+                    
+                    # Mantieni la struttura originale per altre risorse
+                    altre_risorse.append(section)
+            
+            return {
+                'id': course_id,
+                'name': course_name,
+                'programma': programma_html,
+                'annunci': annunci,
+                'videolezioni': videolezioni,
+                'risorse': altre_risorse
+            }, "OK"
+            
+        except Exception as e:
+            print(f"✗ Errore recupero dettagli corso: {e}")
+            import traceback
+            traceback.print_exc()
+            return None, str(e)
+    
+    def get_folder_contents(self, folder_url):
+        """Recupera il contenuto di una cartella Moodle"""
+        if not self.logged_in and not self.load_session():
+            self.login()
+        
+        try:
+            if not folder_url.startswith('http'):
+                folder_url = MYARIEL_BASE_URL + folder_url
+            
+            response = self.session.get(folder_url)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            files = []
+            
+            # Cerca i file nella cartella (struttura Moodle)
+            file_links = soup.find_all('a', href=lambda x: x and ('/pluginfile.php' in x or '/mod/resource/' in x or '/mod/folder/' in x) if x else False)
+            
+            for link in file_links:
+                href = link.get('href')
+                name = link.get_text(strip=True)
+                
+                # Estrai nome pulito
+                instancename = link.find('span', class_='instancename')
+                if instancename:
+                    for accesshide in instancename.find_all('span', class_='accesshide'):
+                        accesshide.decompose()
+                    name = instancename.get_text(strip=True)
+                
+                if name and href and len(name) > 2:
+                    if not href.startswith('http'):
+                        href = MYARIEL_BASE_URL + href
+                    
+                    # Determina il tipo
+                    file_type = 'file'
+                    if '/mod/folder/' in href:
+                        file_type = 'folder'
+                    elif '/mod/url/' in href:
+                        file_type = 'url'
+                    
+                    files.append({
+                        'name': name,
+                        'url': href,
+                        'type': file_type
+                    })
+            
+            return files, "OK"
+            
+        except Exception as e:
+            print(f"✗ Errore recupero contenuto cartella: {e}")
+            return None, str(e)
 
 
 # Istanza globale dello scraper
@@ -684,6 +834,36 @@ def api_course_resources(course_id):
     if resources is None:
         return jsonify({'success': False, 'message': message})
     return jsonify({'success': True, 'resources': resources})
+
+
+@app.route('/course/<course_id>')
+def course_page(course_id):
+    """Pagina dedicata del corso"""
+    return render_template('course.html', course_id=course_id)
+
+
+@app.route('/api/course/<course_id>/details')
+def api_course_details(course_id):
+    """Endpoint per ottenere tutti i dettagli di un corso"""
+    details, message = scraper.get_course_details(course_id)
+    if details is None:
+        return jsonify({'success': False, 'message': message})
+    return jsonify({'success': True, 'data': details})
+
+
+@app.route('/api/folder/contents', methods=['POST'])
+def api_folder_contents():
+    """Endpoint per ottenere il contenuto di una cartella"""
+    data = request.json
+    folder_url = data.get('url', '')
+    
+    if not folder_url:
+        return jsonify({'success': False, 'message': 'URL cartella mancante'}), 400
+    
+    files, message = scraper.get_folder_contents(folder_url)
+    if files is None:
+        return jsonify({'success': False, 'message': message})
+    return jsonify({'success': True, 'files': files})
 
 
 if __name__ == '__main__':

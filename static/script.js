@@ -142,27 +142,19 @@ function createCourseCard(courseData, index) {
     card.className = 'course-card';
     card.dataset.courseId = course.id;
     
-    // Header
+    // Header - Ora cliccabile per andare alla pagina del corso
     const header = document.createElement('div');
     header.className = 'course-header';
     header.innerHTML = `
         <h3>${escapeHtml(course.name)}</h3>
-        <span class="course-toggle">▼</span>
+        <span class="course-action">Apri corso →</span>
     `;
-    header.addEventListener('click', () => toggleCourse(card));
-    
-    // Content
-    const content = document.createElement('div');
-    content.className = 'course-content';
-    
-    // Aggiungi solo sezioni con risorse (i corsi senza sezioni sono già filtrati in displayResources)
-    sections.forEach(section => {
-        const sectionDiv = createSectionElement(section);
-        content.appendChild(sectionDiv);
+    header.style.cursor = 'pointer';
+    header.addEventListener('click', () => {
+        window.location.href = `/course/${course.id}`;
     });
     
     card.appendChild(header);
-    card.appendChild(content);
     
     return card;
 }
